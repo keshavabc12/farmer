@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "description": "Mitti Mitra – Full-stack Soil Research Platform",
   "scripts": {
-    "install:all": "cd backend && npm install && cd ../frontend && npm install",
+    "build": "npm install && cd backend && npm install && cd ../frontend && npm install && npm run build",
+    "start": "cd backend && node server.js",
     "dev:backend": "cd backend && npm run dev",
-    "dev:frontend": "cd frontend && npm run dev",
-    "start:backend": "cd backend && npm start"
+    "dev:frontend": "cd frontend && npm run dev"
   },
   "keywords": ["farmer", "soil", "mongodb", "react", "nodejs"]
 }
