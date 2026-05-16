@@ -8,9 +8,9 @@ router.get("/", async (req, res) => {
     const { status, cropType, village, taluk, page = 1, limit = 20 } = req.query;
     const filter = {};
     if (status) filter.status = status;
-    if (cropType) filter.mainCrop = cropType;
+    if (cropType && cropType !== 'All Crops') filter.q5_mainCrop = cropType;
     if (village) filter.village = new RegExp(village, "i");
-    if (taluk) filter.taluk = taluk;
+    if (taluk && taluk !== 'All Taluks') filter.taluk = taluk;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const [farmers, total] = await Promise.all([
@@ -24,51 +24,63 @@ router.get("/", async (req, res) => {
   }
 });
 
-// GET /api/farmers/stats - Dashboard statistics
+// GET /api/farmers/stats - Dashboard statistics (Comprehensive for SOILSENSE)
 router.get("/stats", async (req, res) => {
   try {
-    const [total, completed, pending, draft] = await Promise.all([
-      Farmer.countDocuments(),
-      Farmer.countDocuments({ status: "Complete" }),
-      Farmer.countDocuments({ status: "Pending" }),
-      Farmer.countDocuments({ status: "Draft" }),
+    const total = await Farmer.countDocuments();
+    if (total === 0) {
+      return res.json({ totals: { total: 0 }, questions: {}, awareness: {}, recentFarmers: [] });
+    }
+
+    const totals = await Farmer.aggregate([
+      { $group: { _id: "$status", count: { $sum: 1 } } }
     ]);
+    
+    const statusCounts = { total, Complete: 0, Pending: 0, Draft: 0 };
+    totals.forEach(t => { if (t._id) statusCounts[t._id] = t.count; });
 
-    const villages = await Farmer.distinct("village");
-    const districts = await Farmer.distinct("district");
+    // High level metrics for Dashboard
+    const aware = await Farmer.countDocuments({ q7_awareServices: { $gte: 4 } });
+    const tested = await Farmer.countDocuments({ q19_everTested: "Yes" });
+    const usesReports = await Farmer.countDocuments({ q24_fertDecision: "Based on soil test report" });
+    const noBarriers = await Farmer.countDocuments({ q18_facilitiesAvailable: "Yes" });
 
-    // Awareness metrics (derived from Section B, D, E)
-    const aware = await Farmer.countDocuments({ b8_awareServices: { $gte: 4 } });
-    const tested = await Farmer.countDocuments({ d20_everTested: "Yes" });
-    const usesReports = await Farmer.countDocuments({ d23_fertDecision: "Based on soil test report" });
-    const noBarriers = await Farmer.countDocuments({ e28_facilitiesAvailable: "Yes" });
+    // Individual question breakdown
+    const fields = [
+      'q1_gender', 'q2_ageGroup', 'q3_education', 'q4_landSize', 'q5_mainCrop', 'q6_farmingExp',
+      'q7_awareServices', 'q8_understandsBenefit', 'q9_knowsExcessDamage', 'q10_knowsHowToTest', 'q11_reducesFertilizer', 'q12_infoAvailable',
+      'q13_easyAccess', 'q14_convenientProcess', 'q15_reasonableTime', 'q16_affordable', 'q17_lacksDiscourages', 'q18_facilitiesAvailable',
+      'q19_everTested', 'q20_frequency', 'q21_reasonNoTest', 'q22_receivedTraining', 'q23_useMoreIfAccessible',
+      'q24_fertDecision', 'q25_excessYield', 'q26_mainFactor',
+      'q27_testingImportant', 'q28_villageLevel', 'q29_resultsQuickly', 'q30_awarenessPrograms'
+    ];
 
-    // Recent 5 responses
-    const recentFarmers = await Farmer.find()
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .select("farmerName village mainCrop status createdAt");
+    const questionStats = {};
+    const aggPromises = fields.map(field => 
+      Farmer.aggregate([
+        { $match: { [field]: { $exists: true, $ne: null } } },
+        { $group: { _id: `$${field}`, count: { $sum: 1 } } },
+        { $sort: { count: -1 } }
+      ]).then(results => {
+        questionStats[field] = results;
+      })
+    );
 
-    // Crop breakdown
-    const cropStats = await Farmer.aggregate([
-      { $group: { _id: "$mainCrop", count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-    ]);
+    await Promise.all(aggPromises);
 
     res.json({
-      totals: { total, completed, pending, draft },
-      villages: villages.length,
-      districts: districts.length,
+      totals: statusCounts,
+      questions: questionStats,
       awareness: {
-        awareOfSoilTesting: total > 0 ? Math.round((aware / total) * 100) : 0,
-        hasTested: total > 0 ? Math.round((tested / total) * 100) : 0,
-        usesReports: total > 0 ? Math.round((usesReports / total) * 100) : 0,
-        noBarriers: total > 0 ? Math.round((noBarriers / total) * 100) : 0,
+        awareOfSoilTesting: Math.round((aware / total) * 100),
+        hasTested: Math.round((tested / total) * 100),
+        usesReports: Math.round((usesReports / total) * 100),
+        noBarriers: Math.round((noBarriers / total) * 100),
       },
-      recentFarmers,
-      cropStats,
+      recentFarmers: await Farmer.find().sort({ createdAt: -1 }).limit(5).select("farmerName village q5_mainCrop status createdAt")
     });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 });

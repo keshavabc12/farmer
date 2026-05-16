@@ -1,57 +1,31 @@
 import { useState, useEffect } from 'react'
-import { fetchStats, fetchFarmers } from '../api'
+import { fetchStats } from '../api'
 
 const STATUS_COLOR = { Complete: '#1a6b3c', Pending: '#d97706', Draft: '#6b7280' }
 const STATUS_BG    = { Complete: '#dcfce7', Pending: '#fef3c7', Draft: '#f3f4f6' }
 
-function StatCard({ label, value, icon, delta, delay }) {
+function StatCard({ label, value, icon, delta, delay, color }) {
   return (
     <div className="card fade-up" style={{
-      position: 'relative', overflow: 'hidden', animationDelay: delay
+      position: 'relative', overflow: 'hidden', animationDelay: delay, borderLeft: `5px solid ${color || '#1a6b3c'}`
     }}>
-      <div style={{ position: 'absolute', right: -8, bottom: -8, fontSize: 42, opacity: 0.05 }}>🌿</div>
+      <div style={{ position: 'absolute', right: -8, bottom: -8, fontSize: 42, opacity: 0.05 }}>🌾</div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <div style={{ fontSize: 9, color: '#9ca3af', fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 4 }}>
+          <div style={{ fontSize: 10, color: '#9ca3af', fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 }}>
             {label}
           </div>
-          <div style={{ fontFamily: "'Crimson Pro',serif", fontSize: 34, fontWeight: 700, color: '#1a6b3c', lineHeight: 1 }}>
-            {value ?? '—'}
+          <div style={{ fontFamily: "'Crimson Pro',serif", fontSize: 36, fontWeight: 800, color: '#1a6b3c', lineHeight: 1 }}>
+            {value ?? '0'}
           </div>
-          <div style={{ fontSize: 11, color: '#4ecb85', fontWeight: 600, marginTop: 4 }}>{delta}</div>
+          <div style={{ fontSize: 12, color: color || '#1a6b3c', fontWeight: 700, marginTop: 6 }}>{delta}</div>
         </div>
         <div style={{
-          width: 38, height: 38, borderRadius: 10, background: '#f0faf4',
+          width: 44, height: 44, borderRadius: 12, background: '#f0faf4',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 18, border: '1px solid #d1fae5'
+          fontSize: 20, border: '1px solid #d1fae5'
         }}>{icon}</div>
       </div>
-    </div>
-  )
-}
-
-function BarChart({ data }) {
-  return (
-    <div className="card fade-up" style={{ animationDelay: '0.13s' }}>
-      <div style={{ fontFamily: "'Crimson Pro',serif", fontSize: 22, fontWeight: 700, color: '#1a6b3c', marginBottom: 2 }}>
-        Key Metrics
-      </div>
-      <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 16 }}>% of surveyed farmers</div>
-      {data.map((d, i) => (
-        <div key={d.label} style={{ marginBottom: 14 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-            <span style={{ fontSize: 12, color: '#374151', fontWeight: 500 }}>{d.label}</span>
-            <span style={{ fontSize: 12, color: '#1a6b3c', fontWeight: 700 }}>{d.pct}%</span>
-          </div>
-          <div style={{ height: 10, background: '#f0faf4', borderRadius: 8, overflow: 'hidden' }}>
-            <div className="bar-fill" style={{
-              '--w': `${d.pct}%`, height: '100%', width: `${d.pct}%`,
-              background: 'linear-gradient(90deg,#1a6b3c,#4ecb85)',
-              borderRadius: 8, animationDelay: `${i * 0.12}s`
-            }} />
-          </div>
-        </div>
-      ))}
     </div>
   )
 }
@@ -64,199 +38,122 @@ export default function Dashboard({ setActive }) {
   useEffect(() => {
     fetchStats()
       .then(r => setStats(r.data))
-      .catch(() => setError('Could not load stats. Is the backend running?'))
+      .catch(() => setError('Could not load stats. Check backend connection.'))
       .finally(() => setLoading(false))
   }, [])
 
   if (loading) return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
       {[...Array(4)].map((_, i) => (
-        <div key={i} className="skeleton" style={{ height: 100 }} />
+        <div key={i} className="skeleton" style={{ height: 120 }} />
       ))}
+      <div className="skeleton" style={{ gridColumn: 'span 2', height: 250 }} />
     </div>
   )
 
-  if (error) return (
-    <div style={{
-      background: '#fee2e2', border: '1.5px solid #fca5a5', borderRadius: 14,
-      padding: 24, color: '#dc2626', fontSize: 14, textAlign: 'center'
-    }}>
-      ❌ {error}
-      <div style={{ marginTop: 8, fontSize: 12, color: '#6b7280' }}>
-        Make sure your backend is running on <code>http://localhost:5000</code>
-      </div>
-    </div>
-  )
-
-  const { totals = {}, villages = 0, awareness = {}, recentFarmers = [] } = stats || {}
-
-  const chartData = [
-    { label: 'Aware of Soil Testing', pct: awareness.awareOfSoilTesting ?? 0 },
-    { label: 'Have Tested Soil',       pct: awareness.hasTested ?? 0 },
-    { label: 'Use Reports',            pct: awareness.usesReports ?? 0 },
-    { label: 'No Barriers',            pct: awareness.noBarriers ?? 0 },
-  ]
-
-  const progressSections = [
-    { label: 'Farmer Profile',  pct: 100 },
-    { label: 'Awareness',       pct: 91 },
-    { label: 'Accessibility',   pct: 88 },
-    { label: 'Adoption',        pct: 76 },
-    { label: 'Dichotomous',     pct: 72 },
-  ]
+  const { totals = {}, awareness = {}, recentFarmers = [] } = stats || {}
 
   return (
-    <div>
-      {/* Page header */}
-      <div className="fade-up" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 22 }}>
+    <div style={{ maxWidth: 1000, margin: '0 auto' }}>
+      {/* Branding Header */}
+      <div className="fade-up" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontFamily: "'Crimson Pro',serif", fontSize: 32, fontWeight: 700, color: '#1a6b3c', lineHeight: 1.1 }}>
-            Dashboard
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+             <span style={{ padding:'2px 8px', background:'#1a6b3c', color:'#fff', borderRadius:4, fontSize:10, fontWeight:900 }}>SOILSENSE</span>
+             <span style={{ fontSize:10, fontWeight:700, color:'#8d6e63' }}>OFFICIAL DASHBOARD</span>
+          </div>
+          <h1 style={{ fontFamily: "'Crimson Pro',serif", fontSize: 36, fontWeight: 800, color: '#1a6b3c', lineHeight: 1 }}>
+            SIT Tumakuru Research
           </h1>
-          <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
-            Tumkur District · {new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
+          <p style={{ fontSize: 13, color: '#9ca3af', marginTop: 4, fontWeight:500 }}>
+            Real-time survey tracking for Soil Testing Adoption Study
           </p>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: '#dcfce7', padding: '5px 10px', borderRadius: 20 }}>
-            <div className="live-dot" style={{ width: 6, height: 6, borderRadius: '50%', background: '#1a6b3c' }} />
-            <span style={{ color: '#1a6b3c', fontSize: 10, fontWeight: 700, letterSpacing: 1 }}>LIVE</span>
-          </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button className="btn-outline" onClick={async () => {
-              try {
-                const res = await fetchFarmers({ limit: 10000 })
-                const data = res.data.farmers
-                if (!data.length) return
-                
-                const headers = Object.keys(data[0]).filter(k => k !== 'photo' && k !== '__v')
-                const csv = [
-                  headers.join(','),
-                  ...data.map(row => headers.map(h => `"${row[h] || ''}"`).join(','))
-                ].join('\n')
-                
-                const blob = new Blob([csv], { type: 'text/csv' })
-                const url = window.URL.createObjectURL(blob)
-                const a = document.createElement('a')
-                a.setAttribute('href', url)
-                a.setAttribute('download', 'all_farmers_data.csv')
-                a.click()
-              } catch (e) { console.error(e) }
-            }} style={{ padding: '5px 12px', fontSize: 10 }}>
-              📊 Full Export
-            </button>
-          </div>
-        </div>
+        <button className="btn-primary" onClick={() => setActive('New Survey')} style={{ width: 'auto', height: 48, padding: '0 24px', fontSize: 14 }}>
+          ＋ Start New Survey
+        </button>
       </div>
 
-      {/* Stat cards */}
-      <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 12, marginBottom: 18 }}>
-        <StatCard label="Surveyed"  value={totals.total?.toLocaleString()}    icon="👥"  delta="+2 today"       delay="0s" />
-        <StatCard label="Completed" value={totals.completed?.toLocaleString()} icon="✅"  delta={`${totals.total ? Math.round((totals.completed/totals.total)*100) : 0}%`} delay="0.06s" />
-        <StatCard label="Pending"   value={totals.pending?.toLocaleString()}   icon="⏳"  delta={`${totals.total ? Math.round((totals.pending/totals.total)*100) : 0}%`}  delay="0.12s" />
-        <StatCard label="Villages"  value={villages}                           icon="📍"  delta="2 Taluks"       delay="0.18s" />
+      {/* Main Stats Grid */}
+      <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
+        <StatCard label="Total Farmers" value={totals.total} icon="👨‍🌾" delta="Total Reach" delay="0s" color="#1a6b3c" />
+        <StatCard label="Completed" value={totals.Complete} icon="✅" delta={`${totals.total ? Math.round((totals.Complete/totals.total)*100) : 0}% success`} delay="0.1s" color="#4ecb85" />
+        <StatCard label="Avg Awareness" value={`${awareness.awareOfSoilTesting}%`} icon="💡" delta="Regional Awareness" delay="0.2s" color="#d97706" />
+        <StatCard label="Soil Tested" value={`${awareness.hasTested}%`} icon="🧪" delta="Adoption Rate" delay="0.3s" color="#3b82f6" />
       </div>
 
-      {/* Bar chart */}
-      <div style={{ marginBottom: 16 }}>
-        <BarChart data={chartData} />
-      </div>
-
-      {/* Recent responses */}
-      <div className="card fade-up" style={{ marginBottom: 16, animationDelay: '0.2s' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <div style={{ fontFamily: "'Crimson Pro',serif", fontSize: 22, fontWeight: 700, color: '#1a6b3c' }}>
-            Recent Responses
-          </div>
-          <div className="tap" onClick={() => setActive('Responses')}
-            style={{ fontSize: 12, color: '#4ecb85', fontWeight: 600 }}>
-            View all →
-          </div>
-        </div>
-        {recentFarmers.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '24px 0', color: '#9ca3af', fontSize: 13 }}>
-            No surveys submitted yet. <span className="tap" style={{ color: '#1a6b3c', fontWeight: 600 }} onClick={() => setActive('New Survey')}>Start one →</span>
-          </div>
-        ) : recentFarmers.map((f, i) => (
-          <div key={f._id} className="tap" style={{
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            padding: '11px 0',
-            borderBottom: i < recentFarmers.length - 1 ? '1px solid #f0faf4' : 'none'
-          }} onClick={() => setActive('Responses')}>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-              <div style={{
-                width: 36, height: 36, borderRadius: '50%', background: '#f0faf4',
-                border: '1.5px solid #d1fae5', display: 'flex', alignItems: 'center',
-                justifyContent: 'center', fontSize: 15, flexShrink: 0
-              }}>👨‍🌾</div>
-              <div>
-                <div style={{ fontSize: 13, color: '#111827', fontWeight: 600 }}>{f.farmerName}</div>
-                <div style={{ fontSize: 11, color: '#9ca3af' }}>{f.village} · {f.mainCrop}</div>
+      <div style={{ display:'grid', gridTemplateColumns: '1fr 1.5fr', gap: 20, marginBottom: 24 }}>
+        {/* Left Column: Awareness Metrics */}
+        <div className="card fade-up" style={{ animationDelay: '0.4s' }}>
+          <h3 style={{ fontFamily:"'Crimson Pro',serif", fontSize:22, fontWeight:800, color:'#1a6b3c', marginBottom:20 }}>Key Indicators</h3>
+          {[
+            { label: 'Aware of Soil Testing', pct: awareness.awareOfSoilTesting || 0, color:'#1a6b3c' },
+            { label: 'Actually Tested Soil', pct: awareness.hasTested || 0, color:'#4ecb85' },
+            { label: 'Follow Recommendations', pct: awareness.usesReports || 0, color:'#d97706' },
+            { label: 'Facility Access Satisfied', pct: awareness.noBarriers || 0, color:'#3b82f6' }
+          ].map(item => (
+            <div key={item.label} style={{ marginBottom:18 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
+                <span style={{ fontSize:12, fontWeight:700, color:'#374151' }}>{item.label}</span>
+                <span style={{ fontSize:12, fontWeight:800, color:item.color }}>{item.pct}%</span>
+              </div>
+              <div style={{ height:8, background:'#f0faf4', borderRadius:4, overflow:'hidden' }}>
+                <div style={{ height:'100%', width:`${item.pct}%`, background:item.color, borderRadius:4, transition:'width 1s ease' }} />
               </div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-              <span className="badge" style={{ background: STATUS_BG[f.status], color: STATUS_COLOR[f.status] }}>
-                {f.status}
-              </span>
-              <span style={{ fontSize: 10, color: '#9ca3af' }}>
-                {new Date(f.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-              </span>
-            </div>
+          ))}
+          <button className="tap" onClick={() => setActive('Analytics')} 
+            style={{ width:'100%', marginTop:10, padding:'10px', background:'#fdfbf7', border:'1.5px solid #d1fae5', borderRadius:10, fontSize:12, fontWeight:700, color:'#1a6b3c' }}>
+            View Full Analytics →
+          </button>
+        </div>
+
+        {/* Right Column: Recent Activity */}
+        <div className="card fade-up" style={{ animationDelay: '0.5s' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <h3 style={{ fontFamily: "'Crimson Pro',serif", fontSize: 22, fontWeight: 800, color: '#1a6b3c' }}>
+              Recent Submissions
+            </h3>
+            <button onClick={() => setActive('Responses')} style={{ background:'none', border:'none', color:'#1a6b3c', fontSize:13, fontWeight:700, cursor:'pointer' }}>View All</button>
           </div>
-        ))}
+          
+          {recentFarmers.length === 0 ? (
+            <div style={{ textAlign:'center', padding:'40px 0', color:'#9ca3af' }}>No surveys submitted today.</div>
+          ) : recentFarmers.map((f, i) => (
+            <div key={f._id} style={{ 
+              display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 0', 
+              borderBottom: i < recentFarmers.length - 1 ? '1px solid #f0faf4' : 'none' 
+            }}>
+              <div style={{ display:'flex', gap:12, alignItems:'center' }}>
+                <div style={{ width:40, height:40, borderRadius:12, background:'#f0faf4', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20 }}>👨‍🌾</div>
+                <div>
+                  <div style={{ fontSize:14, fontWeight:700, color:'#374151' }}>{f.farmerName}</div>
+                  <div style={{ fontSize:11, color:'#9ca3af' }}>{f.village} · {f.q5_mainCrop}</div>
+                </div>
+              </div>
+              <div style={{ textAlign:'right' }}>
+                <span className="badge" style={{ background: STATUS_BG[f.status], color: STATUS_COLOR[f.status], marginBottom:4 }}>{f.status}</span>
+                <div style={{ fontSize:10, color:'#9ca3af' }}>{new Date(f.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* Survey Progress card */}
-      <div className="fade-up" style={{
-        background: 'linear-gradient(135deg,#1a6b3c 0%,#2d8a56 100%)',
-        borderRadius: 16, padding: '22px 20px',
-        boxShadow: '0 8px 28px rgba(26,107,60,0.28)',
-        position: 'relative', overflow: 'hidden',
-        marginBottom: 18, animationDelay: '0.3s'
-      }}>
-        <div style={{ position: 'absolute', right: -30, top: -30, width: 120, height: 120, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.1)' }} />
-        <div style={{ fontFamily: "'Crimson Pro',serif", fontSize: 22, fontWeight: 700, color: '#fff', marginBottom: 2 }}>
-          Survey Progress
-        </div>
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.65)', marginBottom: 18 }}>
-          Target: 1,500 farmers · Tumkur Rural & Gubbi
-        </div>
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)' }}>Overall Completion</span>
-            <span style={{ fontSize: 12, color: '#7fffc4', fontWeight: 700 }}>
-              {totals.total ? Math.min(Math.round((totals.total / 1500) * 100), 100) : 0}%
-            </span>
+      {/* Footer Info */}
+      <div className="card fade-up" style={{ background:'linear-gradient(135deg, #1a6b3c, #114d2a)', color:'#fff', border:'none', animationDelay:'0.6s' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <div>
+            <h4 style={{ fontFamily:"'Crimson Pro',serif", fontSize:20, fontWeight:700 }}>Project Objectives</h4>
+            <p style={{ fontSize:12, opacity:0.8, marginTop:4, maxWidth:500 }}>
+              To identify accessibility barriers, assess awareness levels, and examine adoption patterns of soil testing among rural farmers in Tumkur district.
+            </p>
           </div>
-          <div style={{ height: 12, background: 'rgba(255,255,255,0.15)', borderRadius: 6, overflow: 'hidden' }}>
-            <div style={{
-              height: '100%',
-              width: `${totals.total ? Math.min(Math.round((totals.total / 1500) * 100), 100) : 0}%`,
-              background: 'linear-gradient(90deg,#7fffc4,#4ecb85)', borderRadius: 6,
-              transition: 'width 1s ease'
-            }} />
+          <div style={{ textAlign:'right' }}>
+            <div style={{ fontSize:24 }}>🎓</div>
+            <div style={{ fontSize:10, fontWeight:900, letterSpacing:1 }}>SIT TUMAKURU MBA</div>
           </div>
         </div>
-        {progressSections.map(item => (
-          <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 9 }}>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.72)', width: 110, flexShrink: 0 }}>{item.label}</div>
-            <div style={{ flex: 1, height: 5, background: 'rgba(255,255,255,0.12)', borderRadius: 3, overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${item.pct}%`, background: item.pct === 100 ? '#7fffc4' : 'rgba(255,255,255,0.5)', borderRadius: 3 }} />
-            </div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)', width: 32, textAlign: 'right' }}>{item.pct}%</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Status tags */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        {['📍 GPS: Active', '💾 Auto-Save: ON', '📶 Offline: Ready'].map(tag => (
-          <div key={tag} style={{
-            background: '#fff', border: '1px solid #d1fae5',
-            padding: '6px 12px', borderRadius: 20,
-            fontSize: 11, color: '#1a6b3c', fontWeight: 500
-          }}>{tag}</div>
-        ))}
       </div>
     </div>
   )

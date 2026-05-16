@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { fetchFarmers, deleteFarmer } from '../api'
 import { useToast } from '../context/ToastContext'
+import { downloadCSV } from '../utils'
 
 const STATUS_COLOR = { Complete: '#1a6b3c', Pending: '#d97706', Draft: '#6b7280' }
 const STATUS_BG    = { Complete: '#dcfce7', Pending: '#fef3c7', Draft: '#f3f4f6' }
 const CROPS        = ['All Crops','Paddy','Ragi','Maize','Coconut','Areca','Vegetables','Pulses','Others']
-const TALUKS       = ['All Taluks','Tumkur Rural','Gubbi']
+const TALUKS       = ['All Taluks','Tumkur Rural','Gubbi','Tiptur','Kunigal']
 
 export default function Responses({ setActive }) {
   const [farmers, setFarmers]   = useState([])
@@ -39,10 +40,28 @@ export default function Responses({ setActive }) {
     setDeleting(id)
     try {
       await deleteFarmer(id)
-      toast('Record deleted.', 'success')
+      toast('Record deleted successfully.', 'success')
       load()
-    } catch { toast('Failed to delete.', 'error') }
+    } catch { toast('Failed to delete record.', 'error') }
     finally { setDeleting(null) }
+  }
+
+  const handleExport = async () => {
+    try {
+      toast('Preparing export data...', 'info')
+      const res = await fetchFarmers({ limit: 10000 }) // Fetch all for export
+      const data = res.data.farmers.map(f => {
+        const { photo, __v, ...rest } = f; // Exclude photo and version key
+        return rest;
+      })
+      if (!data.length) return toast('No data to export', 'info')
+      
+      downloadCSV(data, `soilsense_responses_${new Date().toISOString().slice(0,10)}.csv`)
+      toast('CSV Exported successfully! 📥', 'success')
+    } catch (err) {
+      console.error(err)
+      toast('Export failed', 'error')
+    }
   }
 
   const setFilter = (key, val) => { setFilters(p => ({ ...p, [key]: val })); setPage(1) }
@@ -50,170 +69,132 @@ export default function Responses({ setActive }) {
   const pages = Math.ceil(total / 10)
 
   return (
-    <div>
+    <div style={{ maxWidth: 1000, margin: '0 auto' }}>
       {/* Header */}
-      <div className="fade-up" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 22 }}>
+      <div className="fade-up" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontFamily: "'Crimson Pro',serif", fontSize: 30, fontWeight: 700, color: '#1a6b3c' }}>Responses</h1>
-          <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 3 }}>{total} total records</p>
+          <h1 style={{ fontFamily: "'Crimson Pro',serif", fontSize: 32, fontWeight: 800, color: '#1a6b3c' }}>Survey Responses</h1>
+          <p style={{ fontSize: 13, color: '#8d6e63', marginTop: 4, fontWeight:500 }}>{total} farmers surveyed in Tumkur district</p>
         </div>
         <div style={{ display:'flex', gap:10 }}>
-          <button className="btn-outline" onClick={async () => {
-            try {
-              const res = await fetchFarmers({ limit: 1000 }) // Fetch up to 1000 for export
-              const data = res.data.farmers
-              if (!data.length) return toast('No data to export', 'info')
-              
-              const headers = Object.keys(data[0]).filter(k => k !== 'photo' && k !== '__v')
-              const csv = [
-                headers.join(','),
-                ...data.map(row => headers.map(h => `"${row[h] || ''}"`).join(','))
-              ].join('\n')
-              
-              const blob = new Blob([csv], { type: 'text/csv' })
-              const url = window.URL.createObjectURL(blob)
-              const a = document.createElement('a')
-              a.setAttribute('hidden', '')
-              a.setAttribute('href', url)
-              a.setAttribute('download', `farmers_data_${new Date().toISOString().slice(0,10)}.csv`)
-              document.body.appendChild(a)
-              a.click()
-              document.body.removeChild(a)
-              toast('CSV Downloaded! 📥', 'success')
-            } catch { toast('Export failed', 'error') }
-          }} style={{ width: 'auto', padding: '10px 18px' }}>
+          <button className="tap" onClick={handleExport} 
+            style={{ background:'#f0faf4', color:'#1a6b3c', border:'1.5px solid #d1fae5', borderRadius:10, padding:'10px 18px', fontSize:13, fontWeight:700, cursor:'pointer' }}>
             📥 Export CSV
           </button>
-          <button className="btn-primary" onClick={() => setActive('New Survey')} style={{ width: 'auto', padding: '10px 18px' }}>
-            ＋ New Survey
+          <button className="btn-primary" onClick={() => setActive('New Survey')} style={{ width: 'auto', padding: '10px 20px', fontSize:13 }}>
+            ＋ Add New
           </button>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="card fade-up" style={{ marginBottom: 16, animationDelay: '0.07s' }}>
-        <div style={{ fontFamily: "'Crimson Pro',serif", fontSize: 18, fontWeight: 700, color: '#1a6b3c', marginBottom: 14 }}>
-          Filter Responses
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+      {/* Filters Card */}
+      <div className="card fade-up" style={{ marginBottom: 20, background:'#fdfbf7', border:'1.5px solid #f5deb3' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 16 }}>
           <div className="form-group">
-            <label className="form-label">Status</label>
-            <select className="form-select" value={filters.status} onChange={e => setFilter('status', e.target.value)}>
+            <label className="form-label" style={{ color:'#8d6e63' }}>Status</label>
+            <select className="form-input" value={filters.status} onChange={e => setFilter('status', e.target.value)} style={{ background:'#fff' }}>
               <option value="">All Status</option>
               {['Complete','Pending','Draft'].map(s => <option key={s}>{s}</option>)}
             </select>
           </div>
           <div className="form-group">
-            <label className="form-label">Taluk</label>
-            <select className="form-select" value={filters.taluk} onChange={e => setFilter('taluk', e.target.value)}>
+            <label className="form-label" style={{ color:'#8d6e63' }}>Taluk</label>
+            <select className="form-input" value={filters.taluk} onChange={e => setFilter('taluk', e.target.value)} style={{ background:'#fff' }}>
               {TALUKS.map(t => <option key={t}>{t}</option>)}
             </select>
           </div>
           <div className="form-group">
-            <label className="form-label">Crop Type</label>
-            <select className="form-select" value={filters.cropType} onChange={e => setFilter('cropType', e.target.value)}>
+            <label className="form-label" style={{ color:'#8d6e63' }}>Main Crop</label>
+            <select className="form-input" value={filters.cropType} onChange={e => setFilter('cropType', e.target.value)} style={{ background:'#fff' }}>
               {CROPS.map(c => <option key={c}>{c}</option>)}
             </select>
           </div>
           <div className="form-group">
-            <label className="form-label">Village (Search)</label>
-            <input className="form-input" placeholder="Enter village name..." value={filters.village} onChange={e => setFilter('village', e.target.value)} />
+            <label className="form-label" style={{ color:'#8d6e63' }}>Village Search</label>
+            <input className="form-input" placeholder="Search village..." value={filters.village} onChange={e => setFilter('village', e.target.value)} style={{ background:'#fff' }} />
           </div>
         </div>
-        <button className="btn-outline" onClick={() => { setFilters({ status:'', cropType:'', village:'', taluk:'' }); setPage(1) }}>
-          ✕ Clear Filters
-        </button>
+        <div style={{ display:'flex', justifyContent:'flex-end' }}>
+          <button className="tap" onClick={() => { setFilters({ status:'', cropType:'', village:'', taluk:'' }); setPage(1) }}
+            style={{ background:'none', border:'none', color:'#d97706', fontSize:12, fontWeight:700, cursor:'pointer' }}>
+            ✕ Reset All Filters
+          </button>
+        </div>
       </div>
 
-      {/* Table / Cards */}
-      <div className="card fade-up" style={{ animationDelay: '0.13s', padding: 0, overflow: 'hidden' }}>
+      {/* Table Container */}
+      <div className="card fade-up" style={{ padding: 0, overflow: 'hidden', border:'1.5px solid #d1fae5' }}>
         {loading ? (
           <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
             {[...Array(5)].map((_, i) => <div key={i} className="skeleton" style={{ height: 64 }} />)}
           </div>
         ) : farmers.length === 0 ? (
-          <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af' }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
-            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6, color: '#374151' }}>No responses found</div>
-            <div style={{ fontSize: 12 }}>Try adjusting the filters or submit a new survey.</div>
+          <div style={{ padding: 60, textAlign: 'center' }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🌾</div>
+            <h3 style={{ fontFamily:"'Crimson Pro',serif", color: '#1a6b3c', marginBottom:8 }}>No records found</h3>
+            <p style={{ fontSize: 14, color: '#9ca3af' }}>Try clearing filters or start a new survey.</p>
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            {/* Table header */}
-            <div style={{
-              display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr auto',
-              gap: 12, padding: '12px 20px', minWidth: 650,
-              background: '#f0faf4', borderBottom: '1.5px solid #d1fae5',
-              fontSize: 9, fontWeight: 700, color: '#9ca3af', letterSpacing: 1.2, textTransform: 'uppercase'
-            }}>
-              <span>Farmer</span><span>Taluk</span><span>Crop</span><span>Village</span><span>Status</span><span>Actions</span>
-            </div>
-
-            {farmers.map((f, i) => (
-              <div key={f._id} style={{
-                display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr auto',
-                gap: 12, padding: '14px 20px', alignItems: 'center', minWidth: 650,
-                borderBottom: i < farmers.length - 1 ? '1px solid #f0faf4' : 'none',
-                transition: 'background 0.15s',
-              }}
-                onMouseEnter={e => e.currentTarget.style.background = '#f9fff9'}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-              >
-                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                  <div style={{
-                    width: 34, height: 34, borderRadius: '50%', background: '#f0faf4',
-                    border: '1.5px solid #d1fae5', display: 'flex', alignItems: 'center',
-                    justifyContent: 'center', fontSize: 14, flexShrink: 0
-                  }}>👨‍🌾</div>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{f.farmerName}</div>
-                    <div style={{ fontSize: 10, color: '#9ca3af' }}>ID: {f._id.slice(-6).toUpperCase()}</div>
-                  </div>
-                </div>
-                <span style={{ fontSize: 12, color: '#374151' }}>{f.taluk}</span>
-                <span style={{ fontSize: 12, color: '#374151' }}>{f.mainCrop}</span>
-                <span style={{ fontSize: 12, color: '#374151' }}>{f.village}</span>
-                <span className="badge" style={{ background: STATUS_BG[f.status], color: STATUS_COLOR[f.status] }}>
-                  {f.status}
-                </span>
-                <button
-                  onClick={() => handleDelete(f._id)}
-                  disabled={deleting === f._id}
-                  style={{
-                    background: 'none', border: 'none', cursor: 'pointer',
-                    fontSize: 16, opacity: deleting === f._id ? 0.4 : 0.6,
-                    transition: 'opacity 0.15s'
-                  }}>
-                  🗑️
-                </button>
-              </div>
-            ))}
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }}>
+              <thead>
+                <tr style={{ background: '#f0faf4', borderBottom: '2px solid #d1fae5' }}>
+                  <th style={{ textAlign:'left', padding:'16px 20px', fontSize:10, fontWeight:800, color:'#1a6b3c', textTransform:'uppercase', letterSpacing:1 }}>Farmer Name</th>
+                  <th style={{ textAlign:'left', padding:'16px 20px', fontSize:10, fontWeight:800, color:'#1a6b3c', textTransform:'uppercase', letterSpacing:1 }}>Taluk</th>
+                  <th style={{ textAlign:'left', padding:'16px 20px', fontSize:10, fontWeight:800, color:'#1a6b3c', textTransform:'uppercase', letterSpacing:1 }}>Village</th>
+                  <th style={{ textAlign:'left', padding:'16px 20px', fontSize:10, fontWeight:800, color:'#1a6b3c', textTransform:'uppercase', letterSpacing:1 }}>Crop</th>
+                  <th style={{ textAlign:'left', padding:'16px 20px', fontSize:10, fontWeight:800, color:'#1a6b3c', textTransform:'uppercase', letterSpacing:1 }}>Status</th>
+                  <th style={{ textAlign:'center', padding:'16px 20px', fontSize:10, fontWeight:800, color:'#1a6b3c', textTransform:'uppercase', letterSpacing:1 }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {farmers.map((f, i) => (
+                  <tr key={f._id} style={{ borderBottom: '1px solid #f0faf4', transition: 'background 0.15s' }}>
+                    <td style={{ padding:'16px 20px' }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                        <div style={{ width:36, height:36, borderRadius:12, background:'#f0faf4', border:'1px solid #d1fae5', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>
+                          {f.q1_gender === 'Female' ? '👩‍🌾' : '👨‍🌾'}
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: '#374151' }}>{f.farmerName}</div>
+                          <div style={{ fontSize: 10, color: '#9ca3af' }}>ID: {f._id.slice(-6).toUpperCase()}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{ padding:'16px 20px', fontSize: 14, color: '#374151', fontWeight:500 }}>{f.taluk}</td>
+                    <td style={{ padding:'16px 20px', fontSize: 14, color: '#374151' }}>{f.village}</td>
+                    <td style={{ padding:'16px 20px' }}>
+                      <span style={{ fontSize: 12, padding:'4px 10px', background:'#fff', border:'1px solid #d1fae5', borderRadius:20, color:'#1a6b3c', fontWeight:600 }}>
+                        {f.q5_mainCrop || 'N/A'}
+                      </span>
+                    </td>
+                    <td style={{ padding:'16px 20px' }}>
+                      <span className="badge" style={{ background: STATUS_BG[f.status], color: STATUS_COLOR[f.status], padding:'4px 12px', fontSize:10 }}>
+                        {f.status}
+                      </span>
+                    </td>
+                    <td style={{ padding:'16px 20px', textAlign:'center' }}>
+                      <button onClick={() => handleDelete(f._id)} disabled={deleting === f._id} className="tap"
+                        style={{ background:'none', border:'none', fontSize:18, color:'#dc2626', opacity: deleting===f._id ? 0.3 : 0.7 }}>
+                        {deleting===f._id ? '⏳' : '🗑️'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
 
       {/* Pagination */}
       {pages > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems:'center', gap:10, marginTop:24 }}>
           <button className="btn-outline" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-            style={{ padding: '7px 14px' }}>← Prev</button>
-          {[...Array(Math.min(pages, 5))].map((_, i) => {
-            const pg = i + 1
-            return (
-              <button key={pg} onClick={() => setPage(pg)}
-                style={{
-                  padding: '7px 12px', borderRadius: 8, border: '1.5px solid',
-                  borderColor: pg === page ? '#1a6b3c' : '#d1fae5',
-                  background: pg === page ? '#1a6b3c' : '#fff',
-                  color: pg === page ? '#fff' : '#374151',
-                  cursor: 'pointer', fontSize: 12, fontWeight: 600
-                }}>
-                {pg}
-              </button>
-            )
-          })}
+            style={{ padding: '8px 16px', fontSize:13 }}>← Previous</button>
+          <div style={{ fontSize:14, fontWeight:700, color:'#1a6b3c' }}>Page {page} of {pages}</div>
           <button className="btn-outline" onClick={() => setPage(p => Math.min(pages, p + 1))} disabled={page === pages}
-            style={{ padding: '7px 14px' }}>Next →</button>
+            style={{ padding: '8px 16px', fontSize:13 }}>Next →</button>
         </div>
       )}
     </div>

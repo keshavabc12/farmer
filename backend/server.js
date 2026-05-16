@@ -43,8 +43,8 @@ mongoose
     console.log("✅ Connected to MongoDB Atlas");
     await seedAdmin();          // 🌱 auto-seed dummy admin user
     app.listen(PORT, () => {
-      console.log(`🌿 Mitti Mitra server running on http://localhost:${PORT}`);
-      console.log(`📧 Login: admin@mitti.com  🔑 Password: mitti@123`);
+      console.log(`🌿 SOILSENSE server running on http://localhost:${PORT}`);
+      console.log(`📧 Login: admin@soilsense.com  🔑 Password: soilsense@123`);
     });
   })
   .catch((err) => {
